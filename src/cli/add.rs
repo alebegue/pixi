@@ -184,7 +184,7 @@ pub async fn add_specs_to_project(
         let updated_spec = if spec.version.is_none() {
             let mut updated_spec = spec.clone();
             updated_spec.version = Some(VersionSpec::Operator(
-                VersionOperator::StartsWith,
+                VersionOperator::Compatible,
                 best_version,
             ));
             updated_spec
