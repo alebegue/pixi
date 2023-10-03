@@ -11,10 +11,9 @@ use console::style;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use miette::{IntoDiagnostic, WrapErr};
-use rattler_conda_types::version_spec::StrictRangeOperator;
-use rattler_conda_types::PackageName;
+use rattler_conda_types::{version_spec::{EqualityOperator, LogicalOperator, RangeOperator}, PackageName};
 use rattler_conda_types::{
-    MatchSpec, NamelessMatchSpec, Platform, StrictVersion, Version, VersionSpec,
+    MatchSpec, NamelessMatchSpec, Platform, Version, VersionSpec,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
 use rattler_solve::{libsolv_rs, SolverImpl};
@@ -185,10 +184,26 @@ pub async fn add_specs_to_project(
             .expect("a version must have been previously selected");
         let updated_spec = if spec.version.is_none() {
             let mut updated_spec = spec.clone();
-            updated_spec.version = Some(VersionSpec::StrictRange(
-                StrictRangeOperator::StartsWith,
-                StrictVersion(best_version),
-            ));
+            let segment_count = best_version.segment_count();
+            if segment_count == 1 {
+                updated_spec.version = Some(VersionSpec::Exact(EqualityOperator::Equals, best_version));
+            } else {
+                updated_spec.version = Some(
+                    VersionSpec::Group(
+                        LogicalOperator::And,
+                        vec![
+                        VersionSpec::Range(
+                            RangeOperator::GreaterEquals,
+                            best_version.clone(),
+                            ),
+                            VersionSpec::Range(
+                                RangeOperator::Less,
+                                best_version.clone().pop_segments(1).unwrap().bump()
+                            ),
+                        ]
+                    )
+                );
+            }
             updated_spec
         } else {
             spec
